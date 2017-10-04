@@ -55,8 +55,11 @@ Download test dataset.
 
 https://www.ncbi.nlm.nih.gov/gds?term=%22expression+profiling+by+high+throughput+sequencing%22[DataSet+Type]
 ```{r}
-dir.create("data")
+if(!dir.exists("data")){
+  dir.create("data")
+}
 ## manually download suppfilenames_2017-06-19.RData from rstats-tartu/datasets
+## alternatively clone this repo 'rstat-tartu/regex-demo'
 ```
 
 ## Load data

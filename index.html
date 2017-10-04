@@ -160,9 +160,11 @@ $(document).ready(function () {
 <p>Test dataset contains Supplementary file names and some metadata of gene expresion profiling experiments using high-throughput sequencing:</p>
 </blockquote>
 <p><a href="https://www.ncbi.nlm.nih.gov/gds?term=%22expression+profiling+by+high+throughput+sequencing%22%5BDataSet+Type%5D">https://www.ncbi.nlm.nih.gov/gds?term=%22expression+profiling+by+high+throughput+sequencing%22[DataSet+Type]</a></p>
-<pre class="r"><code>dir.create(&quot;data&quot;)</code></pre>
-<pre><code>## Warning in dir.create(&quot;data&quot;): 'data' already exists</code></pre>
-<pre class="r"><code>## manually download suppfilenames_2017-06-19.RData from rstats-tartu/datasets</code></pre>
+<pre class="r"><code>if(!dir.exists(&quot;data&quot;)){
+  dir.create(&quot;data&quot;)
+}
+## manually download suppfilenames_2017-06-19.RData from rstats-tartu/datasets
+## alternatively clone this repo 'rstat-tartu/regex-demo'</code></pre>
 </div>
 <div id="load-data" class="section level2">
 <h2>Load data</h2>
