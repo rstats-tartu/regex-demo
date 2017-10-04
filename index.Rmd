@@ -75,7 +75,7 @@ library(stringr)
 ## Filter out rows with missing file names
 suppfilenames <- suppfilenames %>% 
   filter(!map_lgl(SuppFileNames, ~ inherits(., "try-error")))
-
+suppfilenames %>% select(Accession, PDAT, SuppFileNames)
 ## unnest supplementary file names
 supfn <-  suppfilenames %>% unnest(SuppFileNames)
 supfn %>% select(Accession, PDAT, SuppFileNames)
@@ -87,12 +87,18 @@ To get the length of a text string (i.e. the number of characters in the string)
 
 ```{r}
 str_length("banana")
+str_length("")
 ```
 
 
 Length of supplementary file names.
 ```{r}
-
+supfn <- supfn %>% 
+  select(Accession, PDAT, SuppFileNames) %>% 
+  mutate(strlen = str_length(SuppFileNames))
+supfn
+ggplot(supfn, aes(log(strlen))) + geom_histogram(bins = 40)
+boxplot(log(supfn$strlen))
 ```
 
 ## Let's look at the filenames
@@ -144,7 +150,7 @@ cfraw <- filter(cf, str_detect(common_filenames, "raw.tar")) %>%
   geom_line()
 ```
 
-```{r}
+```{r eval=F}
 # we are looking only for tabular data. 
 out_string1 <- c("filelist|annotation|readme|error|raw.tar|csfasta|bam|sam|bed|[:punct:]hic|hdf5|bismark|map|barcode|peaks")
 out_string2 <- c("tar","gtf","(big)?bed(\\.txt|12|graph|pk)?","bw","wig","hic","gct(x)?","tdf",
