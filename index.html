@@ -137,7 +137,13 @@ $(document).ready(function () {
 <li><p>Most characters, including all letters and digits, are regular expressions that match themselves.</p></li>
 <li><p>Whereas, e.g. . matches any single character.</p></li>
 <li>You can refer also to a character class, which is a list of characters enclosed between [ and ], e.g. [[:alnum:]] is same as [A-z0-9].</li>
-<li><p>Most common character classes: [:alnum:] includes alphanumerics ([:alpha:] and [:digit:]); [:alpha:], includes alphabetic characters ([:upper:] and [:lower:] case); [:punct:] includes punctuation characters ! &quot; # $ % &amp; ’ ( ) * + , - . / : ; &lt; = &gt; ? @ [ ] ^ _ ` ` { | } ~.; [:blank:] includes space and tab; etc.</p></li>
+<li>Most common character classes:
+<ul>
+<li>[:alnum:] includes alphanumerics ([:alpha:] and [:digit:]);</li>
+<li>[:alpha:], includes alphabetic characters ([:upper:] and [:lower:] case);</li>
+<li>[:punct:] includes punctuation characters ! &quot; # $ % &amp; ’ ( ) * + , - . / : ; &lt; = &gt; ? @ [ ] ^ _ ` ` { | } ~.;</li>
+<li>[:blank:] includes space and tab; etc.</li>
+</ul></li>
 <li><p>The metacharacters in regular expressions are .  | ( ) [ { ^ $ * + ?, whether these have a special meaning depending on the context.</p></li>
 <li><p>When matching any metacharacter as a regular character, precede it with a double backslash \.</p></li>
 <li><p>Repetition quantifiers put after regex specify how many times regex is matched: ?, optional, at most once; *, zero or more times; +, one or more times; {n}, n times; {n,}, n or more times; {n,m}, n to m times.</p></li>
@@ -262,6 +268,16 @@ cfraw &lt;- filter(cf, str_detect(common_filenames, &quot;raw.tar&quot;)) %&gt;%
   mutate(N = cumsum(N)) %&gt;%
   ggplot(aes(ymd(PDAT), N, group = 1)) +
   geom_line()</code></pre>
+<pre class="r"><code># we are looking only for tabular data. 
+out_string1 &lt;- c(&quot;filelist|annotation|readme|error|raw.tar|csfasta|bam|sam|bed|[:punct:]hic|hdf5|bismark|map|barcode|peaks&quot;)
+out_string2 &lt;- c(&quot;tar&quot;,&quot;gtf&quot;,&quot;(big)?bed(\\.txt|12|graph|pk)?&quot;,&quot;bw&quot;,&quot;wig&quot;,&quot;hic&quot;,&quot;gct(x)?&quot;,&quot;tdf&quot;,
+                 &quot;gff(3)?&quot;,&quot;pdf&quot;,&quot;png&quot;,&quot;zip&quot;,&quot;sif&quot;,&quot;narrowpeak&quot;,&quot;fa&quot;, &quot;r$&quot;, &quot;rda(ta)?$&quot;)
+
+suppfiles_of_interest &lt;- supfn %&gt;%
+  filter(!str_detect(tolower(SuppFileNames), out_string1),
+         !str_detect(tolower(SuppFileNames), paste0(out_string2, &quot;(\\.gz|\\.bz2)?$&quot;, collapse = &quot;|&quot;))) %&gt;% 
+  select(Accession, SuppFileNames, FTPLink, PDAT) %&gt;% 
+  mutate(filext = str_extract(tolower(SuppFileNames), &quot;\\.[:alpha:]+([:punct:][bgz2]+)?$&quot;)) </code></pre>
 </div>
 
 
