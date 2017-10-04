@@ -178,21 +178,14 @@ $(document).ready(function () {
 </div>
 <div id="unnest-dataset" class="section level2">
 <h2>Unnest dataset</h2>
-<pre class="r"><code>library(tidyverse)</code></pre>
-<pre><code>## Loading tidyverse: ggplot2
-## Loading tidyverse: tibble
-## Loading tidyverse: tidyr
-## Loading tidyverse: readr
-## Loading tidyverse: purrr
-## Loading tidyverse: dplyr</code></pre>
-<pre><code>## Warning: package 'dplyr' was built under R version 3.4.2</code></pre>
-<pre><code>## Conflicts with tidy packages ----------------------------------------------</code></pre>
-<pre><code>## filter(): dplyr, stats
-## lag():    dplyr, stats</code></pre>
-<pre class="r"><code>library(stringr)
-supfn &lt;- suppfilenames %&gt;% 
-  filter(!map_lgl(SuppFileNames, ~ inherits(., &quot;try-error&quot;))) %&gt;% 
-  unnest(SuppFileNames)
+<pre class="r"><code>library(tidyverse)
+library(stringr)
+## Filter out rows with missing file names
+suppfilenames &lt;- suppfilenames %&gt;% 
+  filter(!map_lgl(SuppFileNames, ~ inherits(., &quot;try-error&quot;)))
+
+## unnest supplementary file names
+supfn &lt;-  suppfilenames %&gt;% unnest(SuppFileNames)
 supfn %&gt;% select(Accession, PDAT, SuppFileNames)</code></pre>
 <pre><code>## # A tibble: 23,118 x 3
 ##    Accession       PDAT                                SuppFileNames

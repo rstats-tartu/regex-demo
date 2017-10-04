@@ -72,9 +72,12 @@ load("data/suppfilenames_2017-06-19.RData")
 ```{r}
 library(tidyverse)
 library(stringr)
-supfn <- suppfilenames %>% 
-  filter(!map_lgl(SuppFileNames, ~ inherits(., "try-error"))) %>% 
-  unnest(SuppFileNames)
+## Filter out rows with missing file names
+suppfilenames <- suppfilenames %>% 
+  filter(!map_lgl(SuppFileNames, ~ inherits(., "try-error")))
+
+## unnest supplementary file names
+supfn <-  suppfilenames %>% unnest(SuppFileNames)
 supfn %>% select(Accession, PDAT, SuppFileNames)
 ```
 
