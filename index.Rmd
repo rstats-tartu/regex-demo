@@ -1,0 +1,140 @@
+---
+title: "regex-demo"
+author: "Taavi Päll"
+date: "4 10 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Find character strings
+
+- Character strings can be matched and manipulated in base R by using regular expressions in functions grep, grepl, sub, gsub, regexpr + regmatches and some others. 
+
+- tidyverse package ‘stringr’ contains analogous verbs with more consistent syntax. 
+
+- A regular expression is a pattern that describes a set of strings.
+
+## Regular Expressions as used in R
+
+- Most characters, including all letters and digits, are regular expressions that match themselves. 
+
+- Whereas, e.g. . matches any single character.
+
+- You can refer also to a character class, which is a list of characters enclosed between [ and ], e.g. [[:alnum:]] is same as [A-z0-9].
+- Most common character classes:
+[:alnum:] includes alphanumerics ([:alpha:] and [:digit:]);
+[:alpha:], includes alphabetic characters ([:upper:] and [:lower:] case);
+[:punct:] includes punctuation characters ! " # $ % & ’ ( ) * + , - . / : ; < = > ? @ [  ] ^ _ ` ` { | } ~.;
+[:blank:] includes space and tab; etc.
+
+- The metacharacters in regular expressions are . \ | ( ) [ { ^ $ * + ?, whether these have a special meaning depending on the context.
+
+- When matching any metacharacter as a regular character, precede it with a double backslash \\.
+
+- Repetition quantifiers put after regex specify how many times regex is matched: ?, optional, at most once; *, zero or more times; +, one or more times; {n}, n times; {n,}, n or more times; {n,m}, n to m times.
+
+- The caret ^ and the dollar sign $ are metacharacters that respectively match the empty string at the beginning and end of a line.
+
+## Common operations with regular expressions
+
+- Locate a pattern match (positions)
+
+- Extract a matched pattern
+
+- Identify a match to a pattern
+
+- Replace a matched pattern
+
+## Let's try out
+Download test dataset.
+
+> Test dataset contains Supplementary file names and some metadata of gene expresion profiling experiments using high-throughput sequencing: 
+
+https://www.ncbi.nlm.nih.gov/gds?term=%22expression+profiling+by+high+throughput+sequencing%22[DataSet+Type]
+```{r}
+dir.create("data")
+## manually download suppfilenames_2017-06-19.RData from rstats-tartu/datasets
+```
+
+## Load data
+```{r}
+load("data/suppfilenames_2017-06-19.RData")
+```
+
+
+## Unnest dataset
+```{r}
+library(tidyverse)
+library(stringr)
+supfn <- suppfilenames %>% 
+  filter(!map_lgl(SuppFileNames, ~ inherits(., "try-error"))) %>% 
+  unnest(SuppFileNames)
+supfn %>% select(Accession, PDAT, SuppFileNames)
+```
+
+
+## Get string length
+To get the length of a text string (i.e. the number of characters in the string).
+
+```{r}
+str_length("banana")
+```
+
+
+Length of supplementary file names.
+```{r}
+
+```
+
+## Let's look at the filenames
+```{r}
+# Single most common filename: filelist.txt
+most_common_filename <- supfn %>% 
+  group_by(SuppFileNames) %>% 
+  summarise(N=n()) %>% 
+  arrange(desc(N))
+most_common_filename
+```
+
+Filenames are prepended with GSE id 
+```{r}
+# Supplemental file names with more than N=10 occurences
+cf <- supfn %>%
+  mutate(common_filenames = str_replace(SuppFileNames, "GSE[0-9]*_", ""),
+         common_filenames = str_replace(common_filenames, "\\.gz$", ""), 
+         common_filenames = tolower(common_filenames))
+```
+
+```{r}
+cfn <- group_by(cf, common_filenames) %>% 
+  summarise(N=n()) %>% 
+  arrange(desc(N)) %>% 
+  filter(N > 10)
+
+cfp <- ggplot(cfn, aes(common_filenames, N)) +
+  geom_point() +
+  scale_x_discrete(limits = rev(cfn$common_filenames)) +
+  scale_y_log10() +
+  coord_flip() + 
+  xlab("Common stubs of SuppFileNames\n(>10 occurences) ") +
+  ylab("Number of files")
+
+# plot commonfilenames ggplot
+cfp
+
+```
+
+```{r}
+# Raw data as supplemental file plot (decide wether to show)
+cfraw <- filter(cf, str_detect(common_filenames, "raw.tar")) %>%
+  arrange(PDAT) %>%
+  group_by(PDAT) %>%
+  summarise(N = n()) %>%
+  mutate(N = cumsum(N)) %>%
+  ggplot(aes(ymd(PDAT), N, group = 1)) +
+  geom_line()
+```
+
