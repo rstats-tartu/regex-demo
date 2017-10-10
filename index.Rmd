@@ -91,41 +91,55 @@ str_length("")
 ```
 
 
-Length of supplementary file names.
+> Length of supplementary file names.
+
 ```{r}
 supfn <- supfn %>% 
   select(Accession, PDAT, SuppFileNames) %>% 
   mutate(strlen = str_length(SuppFileNames))
 supfn
-ggplot(supfn, aes(log(strlen))) + geom_histogram(bins = 40)
-boxplot(log(supfn$strlen))
 ```
+
+Plot sizedistribution of supplementary file names:
+```{r}
+ggplot(supfn, aes(strlen)) + geom_histogram(bins = 40)
+```
+
+Distribution seems skewed, what if we plot log transformed strlen values?
+```{r}
+ggplot(supfn, aes(log2(strlen))) + geom_histogram(bins = 40)
+```
+
 
 ## Let's look at the filenames
 ```{r}
 # Single most common filename: filelist.txt
 most_common_filename <- supfn %>% 
   group_by(SuppFileNames) %>% 
-  summarise(N=n()) %>% 
+  summarise(N = n()) %>% 
   arrange(desc(N))
 most_common_filename
 ```
 
+
+## String manipulation
+
 Filenames are prepended with GSE id 
 ```{r}
-# Supplemental file names with more than N=10 occurences
+# Supplemental file names with more than N = 10 occurences
 cf <- supfn %>%
-  mutate(common_filenames = str_replace(SuppFileNames, "GSE[0-9]*_", ""),
-         common_filenames = str_replace(common_filenames, "\\.gz$", ""), 
-         common_filenames = tolower(common_filenames))
+  mutate(common_filenames = str_replace(SuppFileNames, "GSE[0-9]+_", ""),
+         common_filenames = str_replace(common_filenames, "\\.gz$", ""),
+         common_filenames = str_to_lower(common_filenames))
+cf
 ```
 
 ```{r}
 cfn <- group_by(cf, common_filenames) %>% 
-  summarise(N=n()) %>% 
+  summarise(N = n()) %>% 
   arrange(desc(N)) %>% 
   filter(N > 10)
-
+cfn
 cfp <- ggplot(cfn, aes(common_filenames, N)) +
   geom_point() +
   scale_x_discrete(limits = rev(cfn$common_filenames)) +
@@ -139,28 +153,334 @@ cfp
 
 ```
 
+## File name length distribution 2
+
+Now we can filter out "filelist.txt" and "RAW.tar" files and replot file name distribution.
 ```{r}
+filter(supfn, !str_detect(SuppFileNames, "filelist|RAW.tar")) %>% 
+  ggplot(aes(log2(strlen))) + geom_histogram(bins = 40)
+```
+
+> If we filter out "filenames.txt" and "RAW.tar", what is the length interval that contains 90% of filenames?
+
+```{r}
+filter(supfn, !str_detect(SuppFileNames, "filelist|RAW.tar")) %>% 
+  summarise(lower = quantile(strlen, 0.05),
+            upper = quantile(strlen, 0.95))
+```
+
+What is the quantile of an file name length? 
+```{r}
+strlen <- filter(supfn, !str_detect(SuppFileNames, "filelist|RAW.tar")) %>% .$strlen 
+Fn <- ecdf(strlen)
+plot(Fn)
+```
+
+## We have already used `str_detect()` multiple times, what this function actually does?
+```{r}
+## str_detect generates logical vector of matches and nonmatches
+## match letter b against alphabet and get index of TRUE values 
+str_detect(letters, "b") %>% which
+
 # Raw data as supplemental file plot (decide wether to show)
-cfraw <- filter(cf, str_detect(common_filenames, "raw.tar")) %>%
+cfraw <- filter(cf, str_detect(str_to_lower(SuppFileNames), "raw.tar")) %>%
   arrange(PDAT) %>%
   group_by(PDAT) %>%
   summarise(N = n()) %>%
   mutate(N = cumsum(N)) %>%
-  ggplot(aes(ymd(PDAT), N, group = 1)) +
+  ggplot(aes(lubridate::ymd(PDAT), N, group = 1)) +
   geom_line()
+cfraw
 ```
 
+## Regular expressions can be ugly
+We want to filter out non-text or non-table file types. This is wat I came to after several iterations. Sure it can be optimised...
 ```{r eval=F}
 # we are looking only for tabular data. 
 out_string1 <- c("filelist|annotation|readme|error|raw.tar|csfasta|bam|sam|bed|[:punct:]hic|hdf5|bismark|map|barcode|peaks")
-out_string2 <- c("tar","gtf","(big)?bed(\\.txt|12|graph|pk)?","bw","wig","hic","gct(x)?","tdf",
-                 "gff(3)?","pdf","png","zip","sif","narrowpeak","fa", "r$", "rda(ta)?$")
-
+out_string2 <- c("tar","gtf","(big)?bed(\\.txt|12|graph|pk)?","bw",
+                 "wig","hic","gct(x)?","tdf","gff(3)?","pdf","png","zip",
+                 "sif","narrowpeak","fa", "r$", "rda(ta)?$")
+paste0(out_string2, "(\\.gz|\\.bz2)?$", collapse = "|")
 suppfiles_of_interest <- supfn %>%
   filter(!str_detect(tolower(SuppFileNames), out_string1),
-         !str_detect(tolower(SuppFileNames), paste0(out_string2, "(\\.gz|\\.bz2)?$", collapse = "|"))) %>% 
-  select(Accession, SuppFileNames, FTPLink, PDAT) %>% 
-  mutate(filext = str_extract(tolower(SuppFileNames), "\\.[:alpha:]+([:punct:][bgz2]+)?$")) 
-
+         !str_detect(tolower(SuppFileNames), paste0(out_string2, "(\\.gz|\\.bz2)?$", collapse = "|"))) %>%
+  mutate(filext = str_extract(str_to_lower(SuppFileNames), "\\.[:alpha:]+([:punct:][bgz2]+)?$"))
+suppfiles_of_interest
 ```
+
+Most popular file extensions of potentially interesting files.
+```{r}
+fext <- group_by(suppfiles_of_interest, filext) %>% 
+  summarise(N = n()) %>% 
+  arrange(desc(N)) %>% 
+  filter(N > 10)
+fext
+```
+
+```{r}
+ggplot(fext, aes(filext, N)) +
+  geom_point() +
+  scale_x_discrete(limits = rev(fext$filext)) +
+  scale_y_log10() +
+  coord_flip() + 
+  xlab("Common file extensions\n(>10 occurences) ") +
+  ylab("Number of files")
+```
+
+## Look for your favorite gene in abstracts
+Perhaps a more useful example. Let's find summaries containing word "CRISPR/CAS9" indicating use of genome editing.
+```{r}
+string_of_interest <- "crispr"
+crispr <- suppfilenames %>% 
+  filter(str_detect(str_to_lower(summary), string_of_interest))
+crispr
+```
+
+
+We have `r nrow(crispr)` GEO series containing word `r string_of_interest` in summary.
+
+When people started to publish experiments using crispr?
+```{r}
+crispr %>% 
+  ggplot(aes(lubridate::ymd(PDAT))) +
+  geom_histogram(aes(y = cumsum(..count..)), bins = 30) +
+  labs(title = "Number of Entrez GEO series mentioning CRISPR in summary",
+       caption = "Data: Entrez GEO",
+       y = "Cumulative number of studies",
+       x = "Publication date")
+```
+
+
+## Replace parts of a string
+
+`str_replace()`
+
+Let's suppose we want to display files available on these ftp links, but these links have string prepended before URL. 
+We want to remove this "SRASRP.." part to get bare URL. 
+We do this by replacing "SRASRP.." with empty string "".
+(alternatively you can extract URL)
+```{r}
+set.seed(2)
+ftplinks <- suppfilenames %>% 
+  select(ExtRelations) %>% 
+  sample_n(5)
+ftplinks
+```
+
+First on smaller scale:
+```{r}
+url <- ftplinks$ExtRelations[1] %>% str_replace("SRASRP[0-9]+", "")
+url
+```
+
+```{r, eval=FALSE}
+## install.packages("RCurl")
+library(RCurl)
+filenames <- getURL(url, dirlistonly = TRUE)
+filenames
+```
+If we want to go on and download these files, then we need split this string at newlines: "\n".
+
+## String split
+
+Let's split
+```{r}
+str_split(filenames, "\n") %>% unlist
+```
+
+Split summaries by word boundaries/whitespace.
+```{r}
+sums <- suppfilenames %>%
+  # sample_n(10) %>% 
+  select(summary, Accession)
+sums
+```
+
+Smaller scale. Go to `?regex` and compare different regexes for splitting.
+
+> The symbol \w matches a ‘word’ character (a synonym for [[:alnum:]_], an extension) and \W is its negation ([^[:alnum:]_]). Symbols \d, \s, \D and \S denote the digit and space classes and their negations (these are all extensions).
+
+```{r}
+summary100 <- sums$summary[100] %>% str_split("\\s")
+summary100 <- summary100 %>% unlist
+```
+
+Use of str_split within dplyr
+```{r}
+sums %>%
+  sample_n(10) %>% 
+  mutate(words = str_split(summary, "\\s")) %>% 
+  select(-summary) %>% 
+  unnest %>% 
+  count(words) %>% 
+  arrange(desc(n))
+```
+
+
+Go on to compare word frequencies
+```{r}
+# we will do that later
+```
+
+- str_to_lower()
+```{r}
+str_to_lower(summary100)
+```
+
+
+- str_to_title()
+```{r}
+suppfilenames$title[1:10]
+str_to_title(suppfilenames$title[1:10])
+```
+
+
+- str_to_upper()
+```{r}
+suppfilenames$title[1:10]
+str_to_upper(suppfilenames$title[1:10])
+```
+
+- str_trunc()
+```{r}
+str_trunc(suppfilenames$title[1:10], width = 30, side = "right")
+str_trunc(suppfilenames$title[1:10], width = 30, side = "center")
+str_trunc(suppfilenames$title[1:10], width = 30, side = "left")
+```
+
+## Generate strings from data
+- paste()
+```{r}
+# letters
+paste("one", letters)
+paste("one", letters, collapse = " + ")
+paste("one", letters, sep = "+")
+```
+
+- paste0()
+```{r}
+paste0("one", letters)
+```
+
+- str_c() (analogue of paste0())
+```{r}
+str_c("XXX", summary100)
+str_c(summary100, collapse = " ")
+```
+
+- sprintf()
+```{r}
+todays_date <- Sys.Date()
+todays_date
+todays_temp <- 7
+sprintf("Today is %s and temperature is %s", todays_date, 7)
+```
+
+- glue()
+```{r}
+library(glue)
+?glue
+```
+
+## Tidy text analysis
+
+### Tidy data has a specific structure:
+
+- Each variable is a column
+- Each observation is a row
+- Each type of observational unit is a table
+
+### Tidy text format
+
+- Tidy text format as being a table with one-token-per-row. 
+- A token is a meaningful unit of text, such as a word,
+- tokenizing is splitting text to meaningful units
+
+Book: http://tidytextmining.com
+
+Unnest tokens (words)
+```{r}
+# install.packages("tidytext")
+library(tidytext)
+tidy_sums <- sums %>% 
+  unnest_tokens(word, summary)
+tidy_sums
+```
+
+Now that the data is in one-word-per-row format..
+
+We will want to remove stop words; stop words are words that are not useful for an analysis, typically extremely common words such as “the”, “of”, “to”, and so forth in English. 
+We can remove stop words (kept in the tidytext dataset stop_words) with an `anti_join()`.
+```{r}
+data(stop_words)
+tidy_sums <- tidy_sums %>%
+  anti_join(stop_words)
+tidy_sums
+```
+
+Now we can count words.
+```{r}
+tidy_sums %>%
+  count(word, sort = TRUE)
+```
+
+Words with more than 2000 occurences:
+```{r}
+tidy_sums %>%
+  count(word, sort = TRUE) %>%
+  filter(n > 2000) %>%
+  mutate(word = reorder(word, n)) %>%
+  ggplot(aes(word, n)) +
+  geom_col() +
+  xlab(NULL) +
+  coord_flip()
+```
+
+
+### Sentiment analysis
+What is the tone of research abstracts?
+```{r}
+get_sentiments()
+get_sentiments("nrc")$sentiment %>% unique
+get_sentiments("afinn")$score %>% unique
+get_sentiments("bing")$sentiment %>% unique()
+```
+
+Abstract scores 1
+```{r}
+tidy_sums %>% 
+  inner_join(get_sentiments("afinn")) %>% 
+  group_by(Accession) %>% 
+  summarise(mean_score = sum(score)) %>% 
+  ggplot(aes(mean_score)) +
+  geom_histogram(bins = 40)
+```
+
+Let's see most negative and positive abstracts:
+```{r}
+get_sentiments(lexicon = "bing")$sentiment %>% unique()
+summary_sentiments <- tidy_sums %>% 
+  inner_join(get_sentiments("bing")) %>% 
+  count(Accession, sentiment) %>% 
+  spread(sentiment, n, fill = 0) %>%
+  mutate(sentiment = positive - negative)
+summary_sentiments
+```
+
+```{r}
+summary_sentiments %>% 
+  ggplot(aes(sentiment)) +
+  geom_histogram(bins = 40)
+```
+
+Most negative summary:
+```{r}
+summary_sentiments %>% 
+  arrange(sentiment) %>%
+  left_join(select(suppfilenames, Accession, summary))
+```
+
+This sentiment analysis seems way off...
+
 
