@@ -1,7 +1,7 @@
 ---
-title: "regex-demo"
+title: "Regexes"
 author: "Taavi Päll"
-date: "4 10 2017"
+date: "`r lubridate::today()`"
 output: html_document
 ---
 
@@ -161,41 +161,20 @@ filter(supfn, !str_detect(SuppFileNames, "filelist|RAW.tar")) %>%
   ggplot(aes(log2(strlen))) + geom_histogram(bins = 40)
 ```
 
-> If we filter out "filenames.txt" and "RAW.tar", what is the length interval that contains 90% of filenames?
 
-```{r}
-filter(supfn, !str_detect(SuppFileNames, "filelist|RAW.tar")) %>% 
-  summarise(lower = quantile(strlen, 0.05),
-            upper = quantile(strlen, 0.95))
-```
+## `str_detect()`
 
-What is the quantile of an file name length? 
-```{r}
-strlen <- filter(supfn, !str_detect(SuppFileNames, "filelist|RAW.tar")) %>% .$strlen 
-Fn <- ecdf(strlen)
-plot(Fn)
-```
-
-## We have already used `str_detect()` multiple times, what this function actually does?
 ```{r}
 ## str_detect generates logical vector of matches and nonmatches
 ## match letter b against alphabet and get index of TRUE values 
 str_detect(letters, "b") %>% which
-
-# Raw data as supplemental file plot (decide wether to show)
-cfraw <- filter(cf, str_detect(str_to_lower(SuppFileNames), "raw.tar")) %>%
-  arrange(PDAT) %>%
-  group_by(PDAT) %>%
-  summarise(N = n()) %>%
-  mutate(N = cumsum(N)) %>%
-  ggplot(aes(lubridate::ymd(PDAT), N, group = 1)) +
-  geom_line()
-cfraw
 ```
 
 ## Regular expressions can be ugly
-We want to filter out non-text or non-table file types. This is wat I came to after several iterations. Sure it can be optimised...
-```{r eval=F}
+
+We want to filter out some file types.
+
+```{r}
 # we are looking only for tabular data. 
 out_string1 <- c("filelist|annotation|readme|error|raw.tar|csfasta|bam|sam|bed|[:punct:]hic|hdf5|bismark|map|barcode|peaks")
 out_string2 <- c("tar","gtf","(big)?bed(\\.txt|12|graph|pk)?","bw",
@@ -228,19 +207,21 @@ ggplot(fext, aes(filext, N)) +
   ylab("Number of files")
 ```
 
-## Look for your favorite gene in abstracts
-Perhaps a more useful example. Let's find summaries containing word "CRISPR/CAS9" indicating use of genome editing.
+## Look for a word
+
+Let's find summaries containing word "CRISPR".
+
 ```{r}
-string_of_interest <- "crispr"
 crispr <- suppfilenames %>% 
-  filter(str_detect(str_to_lower(summary), string_of_interest))
+  filter(str_detect(str_to_lower(summary), "crispr"))
 crispr
 ```
 
 
-We have `r nrow(crispr)` GEO series containing word `r string_of_interest` in summary.
+We have `r nrow(crispr)` GEO series containing word "crispr" in summary.
 
 When people started to publish experiments using crispr?
+
 ```{r}
 crispr %>% 
   ggplot(aes(lubridate::ymd(PDAT))) +
@@ -254,12 +235,15 @@ crispr %>%
 
 ## Replace parts of a string
 
-`str_replace()`
+`str_replace()` 
 
-Let's suppose we want to display files available on these ftp links, but these links have string prepended before URL. 
+Commonly strings are removed by replacing them with an empty string -- `str_remove()`
+
+Let's suppose we want to fix these ftp links, as these links have string prepended before URL. 
 We want to remove this "SRASRP.." part to get bare URL. 
 We do this by replacing "SRASRP.." with empty string "".
 (alternatively you can extract URL)
+
 ```{r}
 set.seed(2)
 ftplinks <- suppfilenames %>% 
@@ -268,25 +252,16 @@ ftplinks <- suppfilenames %>%
 ftplinks
 ```
 
-First on smaller scale:
 ```{r}
-url <- ftplinks$ExtRelations[1] %>% str_replace("SRASRP[0-9]+", "")
-url
+ftplinks$ExtRelations[2] %>% str_replace("SRASRP[0-9]+", "")
 ```
 
-```{r, eval=FALSE}
-## install.packages("RCurl")
-library(RCurl)
-filenames <- getURL(url, dirlistonly = TRUE)
-filenames
-```
-If we want to go on and download these files, then we need split this string at newlines: "\n".
 
 ## String split
 
 Let's split
 ```{r}
-str_split(filenames, "\n") %>% unlist
+str_split("A\nB", "\n")
 ```
 
 Split summaries by word boundaries/whitespace.
@@ -302,7 +277,7 @@ Smaller scale. Go to `?regex` and compare different regexes for splitting.
 > The symbol \w matches a ‘word’ character (a synonym for [[:alnum:]_], an extension) and \W is its negation ([^[:alnum:]_]). Symbols \d, \s, \D and \S denote the digit and space classes and their negations (these are all extensions).
 
 ```{r}
-summary100 <- sums$summary[100] %>% str_split("\\s")
+summary100 <- sums$summary[100] %>% str_split("\\s+")
 summary100 <- summary100 %>% unlist
 ```
 
@@ -317,13 +292,8 @@ sums %>%
   arrange(desc(n))
 ```
 
+- `str_to_lower()`
 
-Go on to compare word frequencies
-```{r}
-# we will do that later
-```
-
-- str_to_lower()
 ```{r}
 str_to_lower(summary100)
 ```
@@ -336,21 +306,32 @@ str_to_title(suppfilenames$title[1:10])
 ```
 
 
-- str_to_upper()
+- `str_to_upper()`
+
 ```{r}
 suppfilenames$title[1:10]
 str_to_upper(suppfilenames$title[1:10])
 ```
 
-- str_trunc()
+- `str_trunc()`
+
 ```{r}
 str_trunc(suppfilenames$title[1:10], width = 30, side = "right")
 str_trunc(suppfilenames$title[1:10], width = 30, side = "center")
 str_trunc(suppfilenames$title[1:10], width = 30, side = "left")
 ```
 
+- `str_wrap()`
+
+```{r}
+str_wrap(suppfilenames$title[1], width = 30)
+```
+
+
 ## Generate strings from data
-- paste()
+
+- `paste()`
+
 ```{r}
 # letters
 paste("one", letters)
@@ -358,18 +339,21 @@ paste("one", letters, collapse = " + ")
 paste("one", letters, sep = "+")
 ```
 
-- paste0()
+- `paste0()`
+
 ```{r}
 paste0("one", letters)
 ```
 
-- str_c() (analogue of paste0())
+- `str_c()` (analogue of paste0())
+
 ```{r}
 str_c("XXX", summary100)
 str_c(summary100, collapse = " ")
 ```
 
-- sprintf()
+- `sprintf()`
+
 ```{r}
 todays_date <- Sys.Date()
 todays_date
@@ -377,11 +361,15 @@ todays_temp <- 7
 sprintf("Today is %s and temperature is %s", todays_date, 7)
 ```
 
-- glue()
+- `glue()`
+
 ```{r}
 library(glue)
 ?glue
+glue("Answer to 1 + 1 is {1 + 1}.")
 ```
+
+
 
 ## Tidy text analysis
 
@@ -400,6 +388,7 @@ library(glue)
 Book: http://tidytextmining.com
 
 Unnest tokens (words)
+
 ```{r}
 # install.packages("tidytext")
 library(tidytext)
@@ -439,9 +428,13 @@ tidy_sums %>%
 
 
 ### Sentiment analysis
+
 What is the tone of research abstracts?
 ```{r}
+library(textdata)
 get_sentiments()
+
+# Different sentiment databases
 get_sentiments("nrc")$sentiment %>% unique
 get_sentiments("afinn")$score %>% unique
 get_sentiments("bing")$sentiment %>% unique()
@@ -452,8 +445,8 @@ Abstract scores 1
 tidy_sums %>% 
   inner_join(get_sentiments("afinn")) %>% 
   group_by(Accession) %>% 
-  summarise(mean_score = sum(score)) %>% 
-  ggplot(aes(mean_score)) +
+  summarise(sentiment_value = sum(value)) %>% 
+  ggplot(aes(sentiment_value)) +
   geom_histogram(bins = 40)
 ```
 
@@ -463,11 +456,11 @@ get_sentiments(lexicon = "bing")$sentiment %>% unique()
 summary_sentiments <- tidy_sums %>% 
   inner_join(get_sentiments("bing")) %>% 
   count(Accession, sentiment) %>% 
-  spread(sentiment, n, fill = 0) %>%
+  pivot_wider(names_from = sentiment, values_from = n, values_fill = 0) %>%
   mutate(sentiment = positive - negative)
 summary_sentiments
 ```
-
+Sligtly more negative sentiment in abstracts
 ```{r}
 summary_sentiments %>% 
   ggplot(aes(sentiment)) +
@@ -480,7 +473,4 @@ summary_sentiments %>%
   arrange(sentiment) %>%
   left_join(select(suppfilenames, Accession, summary))
 ```
-
-This sentiment analysis seems way off...
-
-
+Let's see what this GSE85013 is..
